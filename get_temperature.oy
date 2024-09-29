@@ -1,0 +1,43 @@
+import random
+import time
+
+# 模拟获取温度读数
+def get_temperature():
+    return random.uniform(-20.0, 40.0)
+
+# 创建一个Stream实例
+temperature_stream = Stream()
+
+# 启动一个线程或进程来不断地向stream中发送温度读数
+def send_temperatures(stream):
+    while True:
+        temp = get_temperature()
+        stream.emit(temp)
+        print(f"Sent temperature: {temp}")
+        time.sleep(1)  # 模拟传感器每秒发送一次数据
+
+# 启动温度发送器
+sender_thread = threading.Thread(target=send_temperatures, args=(temperature_stream,))
+sender_thread.daemon = True
+sender_thread.start()
+
+# 使用map函数转换温度单位（摄氏度转华氏度）
+fahrenheit_stream = temperature_stream.map(lambda celsius: celsius * 9/5 + 32)
+
+# 使用filter函数过滤掉低于冰点的温度
+above_freezing_stream = fahrenheit_stream.filter(lambda fahrenheit: fahrenheit >= 32)
+
+# 使用reduce函数计算过去5分钟内的平均温度
+average_temperature = above_freezing_stream.reduce(
+    lambda acc, curr: (acc[0] * acc[1] + curr) / (acc[1] + 1), 
+    initializer=(0, 0)
+)
+
+# 使用window函数创建一个包含最近5个温度读数的窗口
+recent_temperatures_window = temperature_stream.window(size=5)
+
+# 演示读取窗口数据
+while True:
+    recent_temps = recent_temperatures_window.read()
+    print(f"Recent temperatures: {recent_temps}")
+    time.sleep(5)  # 每5秒打印一次窗口数据
